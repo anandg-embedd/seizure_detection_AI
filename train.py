@@ -34,6 +34,10 @@
 # print("Shape of train_signals:", train_signals.shape)
 # print("Shape of train_labels:", train_labels.shape)
 
+
+import os
+os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
+
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras.models import Sequential

@@ -1,8 +1,14 @@
+import os
+os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
 import numpy as np
 import pandas as pd
 import tensorflow as tf
-import os
 import pywt
+import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
+import random
+import threading
+from playsound import playsound
 
 # Load the trained model
 model = tf.keras.models.load_model("seizure_detection_model.h5")
@@ -29,13 +35,50 @@ def load_signal_from_csv(file_path):
 # Function to predict seizure or normal from a CSV file
 def predict_seizure(file_path):
     signal = load_signal_from_csv(file_path)
-    print("Shape of raw test:", signal.shape)
     signal_f = extract_dwt_features(signal)
-    print("Shape of feature test:", signal_f.shape)
     prediction = model.predict(signal_f)
     return "Seizure" if prediction[0][0] > 0.5 else "Normal"
 
-# Example usage
-csv_file = "dataset/signal_1_label_0.csv"
-prediction = predict_seizure(csv_file)
-print(f"The prediction for {csv_file} is: {prediction}")
+# Directory containing the CSV files
+directory = "dataset/"
+csv_files = [os.path.join(directory, file_name) for file_name in os.listdir(directory) if file_name.endswith(".csv")]
+
+# Initialize the plot
+fig, ax = plt.subplots()
+lines = []
+
+# Variable to store the previous prediction
+previous_prediction = None
+
+# Function to play audio in a separate thread
+def play_audio(file):
+    threading.Thread(target=playsound, args=(file,)).start()
+
+# Function to update the plot
+def update(frame):
+    global previous_prediction
+    #file_path = csv_files[frame % len(csv_files)]
+    file_path = random.choice(csv_files)
+    signal = load_signal_from_csv(file_path)
+    prediction = predict_seizure(file_path)
+    ax.clear()
+    for i in range(signal.shape[2]):
+        line, = ax.plot(signal[0, :, i], label=f'Channel {i+1}')
+        lines.append(line)
+    ax.set_title(f'Signal: {os.path.basename(file_path)} - {prediction}')
+    ax.set_xlabel('Time')
+    ax.set_ylabel('Amplitude')
+    ax.legend()
+
+    # Play audio only if the prediction has changed
+    if prediction != previous_prediction:
+        if prediction == "Seizure":
+            play_audio('seizure.wav')
+        else:
+            play_audio('normal.wav')
+        previous_prediction = prediction
+
+# Create the animation
+ani = FuncAnimation(fig, update, frames=len(csv_files), interval=200)
+
+plt.show()
